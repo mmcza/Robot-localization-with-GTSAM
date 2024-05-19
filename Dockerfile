@@ -42,7 +42,7 @@ RUN apt-get update -q && \
 RUN apt-get update -q && \
         export DEBIAN_FRONTEND=noninteractive && \
     rm -rf /var/lib/apt/lists/*
-RUN pip install open3d
+RUN pip install open3d && pip install gtsam && pip install numpy==1.24.4
 RUN sed -i 's/--no-generate//g' /usr/share/bash-completion/completions/apt-get && \
     sed -i 's/--no-generate//g' /usr/share/bash-completion/completions/apt-cache
 WORKDIR /root/

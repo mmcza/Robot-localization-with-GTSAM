@@ -1,21 +1,19 @@
 import gtsam
-# from gtsam.symbol_shorthand import X, V, B
-# from gtsam import PriorFactor, BetweenFactor, Pose3, Rot3, Point3, noiseModel
-from gtsam import NonlinearFactorGraph, Values
-from gtsam.symbol_shorthand import X, V, B
-from gtsam import PriorFactorPose3, BetweenFactorPose3
-from gtsam import Pose3, Rot3, Point3
-from gtsam import noiseModel
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, LaserScan
 from nav_msgs.msg import Odometry
 import numpy as np
 import open3d as o3d
+from gtsam import NonlinearFactorGraph, Values
+from gtsam.symbol_shorthand import X
+from gtsam import PriorFactorPose3, BetweenFactorPose3
+from gtsam import Pose3, Rot3, Point3
+from gtsam import noiseModel
 
 
 class localization_estimator(Node):
-    def __init__(self):
+    def __init__(self): 
         super().__init__('localization_estimator')
         self.optimizer_initialized_ = False
         self.imu_sub_ = self.create_subscription(Imu, '/imu/data', self.imu_callback, 10)  # Subskrypcja danych z IMU
@@ -25,13 +23,13 @@ class localization_estimator(Node):
 
         # Inicjalizacja GTSAM
         prior_noise = noiseModel.Diagonal.Sigmas([0.1] * 6)  # Szum a priori
-        self.graph_ = gtsam.NonlinearFactorGraph()  # Graf czynników
-        self.graph_.add(PriorFactor(X(0), Pose3(), prior_noise))  # Dodanie czynnika a priori
-        self.initial_estimate_ = gtsam.Values()  # Początkowe estymacja
+        self.graph_ = NonlinearFactorGraph()  # Graf czynników
+        self.graph_.add(PriorFactorPose3(X(0), Pose3(), prior_noise))  # Dodanie czynnika a priori
+        self.initial_estimate_ = Values()  # Początkowe estymacja
         self.initial_estimate_.insert(X(0), Pose3())
 
         self.prev_pose_ = Pose3()
-        self.prev_velocity_ = gtsam.Vector3(0, 0, 0)
+        self.prev_velocity_ = self.Vector3(0, 0, 0)
         self.prev_bias_ = gtsam.imuBias.ConstantBias()
         self.prev_time_ = self.get_clock().now()
 
@@ -39,6 +37,8 @@ class localization_estimator(Node):
         self.reference_cloud = None
         self.keyframe_index_ = 0
 
+    def Vector3(self, x, y, z):
+        return np.array([x, y, z])
 
     def convert_laserscan_to_open3d(self, msg):
     
@@ -62,7 +62,7 @@ class localization_estimator(Node):
         points = points[valid_points]
     	
     	# Create a point cloud in open3d format
-        point_cloud = o3d.geometry.PointCloud()  # Inicjalizacja chmury punktów Open3D
+        point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(points)
         return point_cloud
 
@@ -78,8 +78,8 @@ class localization_estimator(Node):
         if not msg:
             self.get_logger().error("Problem with IMU data")
             return
-        accelerometer = gtsam.Vector3(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z)
-        gyroscope = gtsam.Vector3(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z)
+        accelerometer = self.Vector3(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z)
+        gyroscope = self.Vector3(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z)
         current_time = self.get_clock().now()  # Aktualny czas
         dt = (current_time - self.prev_time_).nanoseconds / 1e9
         self.prev_time_ = current_time

@@ -40,7 +40,7 @@ git clone https://github.com/mmcza/Robot-localization-with-GTSAM
 sudo apt-get install -y ros-humble-turtlebot3-gazebo && sudo apt-get install -y ros-humble-nav2-bringup && sudo apt-get install -y ros-humble-navigation2 && sudo apt-get install -y ros-humble-gtsam && sudo apt-get install -y python3-pip
 ```
 ```
-pip install open3d
+pip install open3d && pip install gtsam && pip install numpy==1.24.4
 ```
 
 ### b.) With Docker
