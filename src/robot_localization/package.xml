@@ -1,19 +1,18 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>gtsam_planner</name>
+  <name>robot_localization</name>
   <version>0.0.1</version>
   <description>GTSAM implemetation for robot localization</description>
 
   <maintainer email="marcin.m.czajka@student.put.poznan.pl">Marcin Czajka</maintainer>
   <license>Apache-2.0</license> 
 
-  <buildtool_depend>ament_python</buildtool_depend> 
-
-  <depend>rclpy</depend> 
-  <depend>sensor_msgs</depend> 
-  <depend>nav_msgs</depend> 
-  <depend>geometry_msgs</depend> 
-  <depend>visualization_msgs</depend> 
+  <exec_depend>rclpy</exec_depend> 
+  <exec_depend>sensor_msgs</exec_depend> 
+  <exec_depend>nav_msgs</exec_depend> 
+  <exec_depend>geometry_msgs</exec_depend> 
+  <exec_depend>visualization_msgs</exec_depend> 
+  <exec_depend>numpy</exec_depend> 
   <exec_depend>gtsam</exec_depend> 
   <exec_depend>open3d</exec_depend> 
 

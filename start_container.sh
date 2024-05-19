@@ -34,5 +34,5 @@ docker run -it --rm \
 	--env="NVIDIA_VISIBLE_DEVICES=all" \
 	--env="NVIDIA_DRIVER_CAPABILITIES=all" \
         --network=host \
-	rrt_star_tb3 \
+	robot_localization \
 	bash

@@ -29,10 +29,12 @@ RUN apt-get update -q && \
         net-tools \
         iputils-ping \
         terminator \
-        ros-dev-tools && \
+        ros-dev-tools \
+        python3-pip && \
     apt-get install -y ros-humble-turtlebot3-gazebo && \
     apt-get install -y ros-humble-nav2-bringup && \
     apt-get install -y ros-humble-navigation2 && \
+    apt-get install -y ros-humble-gtsam && \
     apt-get autoclean -y && \
     apt-get autoremove -y && \
     apt-get clean && \
@@ -40,6 +42,7 @@ RUN apt-get update -q && \
 RUN apt-get update -q && \
         export DEBIAN_FRONTEND=noninteractive && \
     rm -rf /var/lib/apt/lists/*
+RUN pip install open3d
 RUN sed -i 's/--no-generate//g' /usr/share/bash-completion/completions/apt-get && \
     sed -i 's/--no-generate//g' /usr/share/bash-completion/completions/apt-cache
 WORKDIR /root/

@@ -1,17 +1,22 @@
+import gtsam
+# from gtsam.symbol_shorthand import X, V, B
+# from gtsam import PriorFactor, BetweenFactor, Pose3, Rot3, Point3, noiseModel
+from gtsam import NonlinearFactorGraph, Values
+from gtsam.symbol_shorthand import X, V, B
+from gtsam import PriorFactorPose3, BetweenFactorPose3
+from gtsam import Pose3, Rot3, Point3
+from gtsam import noiseModel
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, LaserScan
 from nav_msgs.msg import Odometry
-import gtsam
-from gtsam.symbol_shorthand import X, V, B
-from gtsam import PriorFactor, BetweenFactor, Pose3, Rot3, Point3, noiseModel
 import numpy as np
 import open3d as o3d
 
 
 class localization_estimator(Node):
     def __init__(self):
-        super().__init__('gtsam_planner')
+        super().__init__('localization_estimator')
         self.optimizer_initialized_ = False
         self.imu_sub_ = self.create_subscription(Imu, '/imu/data', self.imu_callback, 10)  # Subskrypcja danych z IMU
         self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)  # Subskrypcja danych odometrii
@@ -38,23 +43,23 @@ class localization_estimator(Node):
     def convert_laserscan_to_open3d(self, msg):
     
     	# Extract the data fram message
-    	ranges = np.array(msg.ranges)
-    	angle_min = np.array(msg.angle_min)
-    	angle_max = np.array(msg.angle_max)
-    	angle_increment = np.array(msg.angle_increment)
+        ranges = np.array(msg.ranges)
+        angle_min = np.array(msg.angle_min)
+        angle_max = np.array(msg.angle_max)
+        angle_increment = np.array(msg.angle_increment)
     	
     	# Create array with all angles and calculate x, y coordinates of each measurement
-    	angles = np.arange(angle_min, angle_max, angle_increment)
-    	x = ranges * np.cos(angles)
-    	y = ranges * np.sin(angles)
-    	z = np.zeros_like(x)
+        angles = np.arange(angle_min, angle_max, angle_increment)
+        x = ranges * np.cos(angles)
+        y = ranges * np.sin(angles)
+        z = np.zeros_like(x)
     	
     	# Create an array of points
-    	points = np.vstack((x, y, z)).T
+        points = np.vstack((x, y, z)).T
     	
     	# Remove wrong measurements (missing or infinite values)
-    	valid_points = np.isfinite(ranges)
-    	points = points[valid_points]
+        valid_points = np.isfinite(ranges)
+        points = points[valid_points]
     	
     	# Create a point cloud in open3d format
         point_cloud = o3d.geometry.PointCloud()  # Inicjalizacja chmury punktów Open3D
@@ -79,7 +84,7 @@ class localization_estimator(Node):
         dt = (current_time - self.prev_time_).nanoseconds / 1e9
         self.prev_time_ = current_time
 
-    	#TODO implementacja grafu czynnikow dla IMU
+        #TODO implementacja grafu czynnikow dla IMU
         imu_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
 
@@ -121,7 +126,6 @@ class localization_estimator(Node):
         translation = Point3(translation_vector[0], translation_vector[1], translation_vector[2])
         lidar_pose = Pose3(rotation, translation)
         #TODO implementacja grafu czynnikow dla danych z Lidara
-
 
     def optimize_graph(self):
         lm_params = gtsam.LevenbergMarquardtParams()
