@@ -6,19 +6,21 @@ from nav_msgs.msg import Odometry
 import numpy as np
 import open3d as o3d
 from gtsam import NonlinearFactorGraph, Values
-from gtsam.symbol_shorthand import X
+from gtsam.symbol_shorthand import X,V, B
 from gtsam import PriorFactorPose3, BetweenFactorPose3
 from gtsam import Pose3, Rot3, Point3
 from gtsam import noiseModel
 
 
 class localization_estimator(Node):
-    def __init__(self): 
+    def __init__(self):
         super().__init__('localization_estimator')
         self.optimizer_initialized_ = False
         self.imu_sub_ = self.create_subscription(Imu, '/imu/data', self.imu_callback, 10)  # Subskrypcja danych z IMU
-        self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)  # Subskrypcja danych odometrii
-        self.lidar_sub_ = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)  # Subskrypcja danych z Lidara
+        self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback,
+                                                  10)  # Subskrypcja danych odometrii
+        self.lidar_sub_ = self.create_subscription(LaserScan, '/scan', self.lidar_callback,
+                                                   10)  # Subskrypcja danych z Lidara
         self.state_pub_ = self.create_publisher(Odometry, '/estimated_state', 10)  # Publikacja estymowanego stanu
 
         # Inicjalizacja GTSAM
@@ -41,27 +43,27 @@ class localization_estimator(Node):
         return np.array([x, y, z])
 
     def convert_laserscan_to_open3d(self, msg):
-    
-    	# Extract the data from message
+
+        # Extract the data from message
         ranges = np.array(msg.ranges)
         angle_min = np.array(msg.angle_min)
         angle_max = np.array(msg.angle_max)
         angle_increment = np.array(msg.angle_increment)
-    	
-    	# Create array with all angles and calculate x, y coordinates of each measurement
+
+        # Create array with all angles and calculate x, y coordinates of each measurement
         angles = np.arange(angle_min, angle_max, angle_increment)
         x = ranges * np.cos(angles)
         y = ranges * np.sin(angles)
         z = np.zeros_like(x)
-    	
-    	# Create an array of points
+
+        # Create an array of points
         points = np.vstack((x, y, z)).T
-    	
-    	# Remove wrong measurements (missing or infinite values)
+
+        # Remove wrong measurements (missing or infinite values)
         valid_points = np.isfinite(ranges)
         points = points[valid_points]
-    	
-    	# Create a point cloud in open3d format
+
+        # Create a point cloud in open3d format
         point_cloud = o3d.geometry.PointCloud()
         point_cloud.points = o3d.utility.Vector3dVector(points)
         return point_cloud
@@ -71,7 +73,7 @@ class localization_estimator(Node):
         trans_init = np.eye(4)  # Inicjalizacja macierzy transformacji
         icp_result = o3d.pipelines.registration.registration_icp(
             source_cloud, target_cloud, threshold, trans_init,
-            o3d.pipelines.registration.TransformationEstimationPointToPoint())  #ICP
+            o3d.pipelines.registration.TransformationEstimationPointToPoint())  # ICP
         return icp_result.transformation
 
     def imu_callback(self, msg):
@@ -84,9 +86,8 @@ class localization_estimator(Node):
         dt = (current_time - self.prev_time_).nanoseconds / 1e9
         self.prev_time_ = current_time
 
-        #TODO implementacja grafu czynnikow dla IMU
+        # TODO implementacja grafu czynnikow dla IMU
         imu_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
-
 
     def odom_callback(self, msg):
         if not msg:
@@ -102,9 +103,14 @@ class localization_estimator(Node):
                 msg.pose.pose.position.y,
                 msg.pose.pose.position.z))
 
-        #TODO implementacja grafu czynnikow dla odometrii
-        odom_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+        odom_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]))
+        if self.keyframe_index_ > 0:
+            between_factor = BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), odom_pose,
+                                                odom_noise)
+            self.graph_.add(between_factor)
 
+        self.initial_estimate_.insert(X(self.keyframe_index_), odom_pose)
+        self.keyframe_index_ += 1
 
     def lidar_callback(self, msg):
         if not msg:
@@ -125,11 +131,17 @@ class localization_estimator(Node):
         rotation = Rot3(rotation_matrix)
         translation = Point3(translation_vector[0], translation_vector[1], translation_vector[2])
         lidar_pose = Pose3(rotation, translation)
-        #TODO implementacja grafu czynnikow dla danych z Lidara
+        # TODO implementacja grafu czynnikow dla danych z Lidara
+        lidar_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]))
+        if self.keyframe_index_>0:
+            between_factor = BetweenFactorPose3(X(self.keyframe_index_-1), X(self.keyframe_index_), lidar_pose, lidar_noise)
+            self.graph_add(between_factor)
+        self.initial_estimate_.insert(X(self.keyframe_index_), lidar_pose)
+        self.keyframe_index_+=1
 
     def optimize_graph(self):
         lm_params = gtsam.LevenbergMarquardtParams()
-        lm_params.setMaxIterations(100) #ustawienie parametrów dla optymalizatora Levenberg Marquardt
+        lm_params.setMaxIterations(100)  # ustawienie parametrów dla optymalizatora Levenberg Marquardt
         lm_params.setRelativeErrorTol(1e-5)
         optimizer = gtsam.LevenbergMarquardtOptimizer(self.graph_, self.initial_estimate_, lm_params)
         self.optimized_estimate_ = optimizer.optimize()
@@ -146,8 +158,8 @@ class localization_estimator(Node):
         estimated_state.pose.pose.orientation.y = optimized_orientation.y()
         estimated_state.pose.pose.orientation.z = optimized_orientation.z()
         self.state_pub_.publish(estimated_state)
-        self.graph_.resize(0) #resetowanie grafu
-        self.initial_estimate_.clear() #resetowanie estymacji
+        self.graph_.resize(0)  # resetowanie grafu
+        self.initial_estimate_.clear()  # resetowanie estymacji
 
 
 def main(args=None):
