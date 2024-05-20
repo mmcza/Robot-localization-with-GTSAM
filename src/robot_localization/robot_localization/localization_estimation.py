@@ -42,7 +42,7 @@ class localization_estimator(Node):
 
     def convert_laserscan_to_open3d(self, msg):
     
-    	# Extract the data fram message
+    	# Extract the data from message
         ranges = np.array(msg.ranges)
         angle_min = np.array(msg.angle_min)
         angle_max = np.array(msg.angle_max)
@@ -129,7 +129,7 @@ class localization_estimator(Node):
 
     def optimize_graph(self):
         lm_params = gtsam.LevenbergMarquardtParams()
-        lm_params.setMaxIterations(100)
+        lm_params.setMaxIterations(100) #ustawienie parametrów dla optymalizatora Levenberg Marquardt
         lm_params.setRelativeErrorTol(1e-5)
         optimizer = gtsam.LevenbergMarquardtOptimizer(self.graph_, self.initial_estimate_, lm_params)
         self.optimized_estimate_ = optimizer.optimize()
@@ -146,8 +146,8 @@ class localization_estimator(Node):
         estimated_state.pose.pose.orientation.y = optimized_orientation.y()
         estimated_state.pose.pose.orientation.z = optimized_orientation.z()
         self.state_pub_.publish(estimated_state)
-        self.graph_.resize(0)
-        self.initial_estimate_.clear()
+        self.graph_.resize(0) #resetowanie grafu
+        self.initial_estimate_.clear() #resetowanie estymacji
 
 
 def main(args=None):
