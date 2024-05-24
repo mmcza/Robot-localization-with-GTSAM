@@ -21,8 +21,6 @@ def isRotationMatrix(R) :
     return n < 1e-6
  
 # Calculates rotation matrix to euler angles
-# The result is the same as MATLAB except the order
-# of the euler angles ( x and z are swapped ).
 def rotationMatrixToEulerAngles(R) :
  
     assert(isRotationMatrix(R))
@@ -56,7 +54,7 @@ class localization_estimator(Node):
 
         # GTSAM
         prior_noise = noiseModel.Diagonal.Sigmas([0.1] * 6)  # Prior noise for initial position
-        self.graph_ = gtsam.NonlinearFactorGraph()  # 
+        self.graph_ = gtsam.NonlinearFactorGraph()  # Create graph
         self.graph_.add(PriorFactorPose3(X(0), Pose3(), prior_noise))  # Add prior factor to the graph
         self.initial_estimate_ = gtsam.Values()  # Initial state estimates
         self.initial_estimate_.insert(X(0), Pose3())
@@ -79,7 +77,14 @@ class localization_estimator(Node):
         #     file.close()
 
     def initial_pose_callback(self, msg):
+        self.got_initial_pose = False
+        self.graph_ = gtsam.NonlinearFactorGraph()  # Reset the graph
+        prior_noise = noiseModel.Diagonal.Sigmas([0.1] * 6)  # Prior noise for initial position
+        self.graph_.add(PriorFactorPose3(X(0), Pose3(), prior_noise))  # Add prior factor to the graph
+        self.initial_estimate_ = gtsam.Values()  # Reset Initial state
+        self.initial_estimate_.insert(X(0), Pose3())
         self.got_initial_pose = True
+        self.keyframe_index_ = 1
 
 
     def preintegration_parameters(self, msg):
@@ -146,87 +151,84 @@ class localization_estimator(Node):
             return
         if not is_pim_set:
             self.preintegration_parameters(msg)
-        accelerometer = self.Vector3(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z)
-        gyroscope = self.Vector3(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z)
-        current_time = self.get_clock().now()  # Aktualny czas
-        dt = (current_time - self.prev_time_).nanoseconds / 1e9
-        self.prev_time_ = current_time
+        if self.got_initial_pose:
+            accelerometer = self.Vector3(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z)
+            gyroscope = self.Vector3(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z)
+            current_time = self.get_clock().now()  # Aktualny czas
+            dt = (current_time - self.prev_time_).nanoseconds / 1e9
+            self.prev_time_ = current_time
 
-        pim.integrateMeasurement(measuredAcc, measuredOmega, dt)
+            pim.integrateMeasurement(measuredAcc, measuredOmega, dt)
 
-        if self.imu_timer > 0.1:
-            imufactor=gtsam.ImuFactor(X(self.keyframe_index -1), V(self.keyframeindex -1), X(self.keyframeindex), V(self.keyframeindex), B(0), self.pim)
-            self.graph_.add(imufactor)
-            dt = 0.0
-            pim.resetIntegration()
-
-    	# #TODO 
-        # imu_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+            if self.imu_timer > 0.1:
+                imufactor=gtsam.ImuFactor(X(self.keyframe_index -1), V(self.keyframeindex -1), X(self.keyframeindex), V(self.keyframeindex), B(0), self.pim)
+                self.graph_.add(imufactor)
+                dt = 0.0
+                pim.resetIntegration()
 
      # Callback for odometry data
     def odom_callback(self, msg):
         if not msg:
             self.get_logger().error("Problem with odometry data")
             return
-        odom_pose = Pose3(Rot3.Quaternion(
-            msg.pose.pose.orientation.w,
-            msg.pose.pose.orientation.x,
-            msg.pose.pose.orientation.y,
-            msg.pose.pose.orientation.z),
-            Point3(
-                msg.pose.pose.position.x,
-                msg.pose.pose.position.y,
-                msg.pose.pose.position.z))
+        if self.got_initial_pose:
+            odom_pose = Pose3(Rot3.Quaternion(
+                msg.pose.pose.orientation.w,
+                msg.pose.pose.orientation.x,
+                msg.pose.pose.orientation.y,
+                msg.pose.pose.orientation.z),
+                Point3(
+                    msg.pose.pose.position.x,
+                    msg.pose.pose.position.y,
+                    msg.pose.pose.position.z))
 
-        # Implement factor graph for odometry data
-        odom_noise = gtsam.noiseModel.Diagonal.Sigmas([msg.pose.covariance[0],
-                                                        msg.pose.covariance[7],
-                                                        msg.pose.covariance[14],
-                                                        msg.pose.covariance[21],
-                                                        msg.pose.covariance[28],
-                                                        msg.pose.covariance[35]])
-        # if self.keyframe_index_ == 0:
-        #     self.graph_.add(PriorFactorPose3(X(self.keyframe_index_), odom_pose, odom_noise))
-        #     self.initial_estimate_.insert(X(self.keyframe_index_), odom_pose)
-        # else:
-        relative_pose = self.prev_pose_.between(odom_pose)
-        self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), relative_pose, odom_noise))
-        self.initial_estimate_.insert(X(self.keyframe_index_), odom_pose)
-        self.prev_pose_ = odom_pose
-        self.optimize_graph()
-        self.keyframe_index_ += 1
+            # Implement factor graph for odometry data
+            odom_noise = gtsam.noiseModel.Diagonal.Sigmas([msg.pose.covariance[0],
+                                                            msg.pose.covariance[7],
+                                                            msg.pose.covariance[14],
+                                                            msg.pose.covariance[21],
+                                                            msg.pose.covariance[28],
+                                                            msg.pose.covariance[35]])
+            # if self.keyframe_index_ == 0:
+            #     self.graph_.add(PriorFactorPose3(X(self.keyframe_index_), odom_pose, odom_noise))
+            #     self.initial_estimate_.insert(X(self.keyframe_index_), odom_pose)
+            # else:
+            relative_pose = self.prev_pose_.between(odom_pose)
+            self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), relative_pose, odom_noise))
+            self.initial_estimate_.insert(X(self.keyframe_index_), odom_pose)
+            self.prev_pose_ = odom_pose
+            self.optimize_graph()
+            self.keyframe_index_ += 1
 
     def lidar_callback(self, msg):
         if not msg:
             self.get_logger().error("Problem with LIDAR data")
             return
-
-        point_cloud = self.convert_laserscan_to_open3d(msg)
-        if self.reference_cloud is None:
+        if self.got_initial_pose:
+            point_cloud = self.convert_laserscan_to_open3d(msg)
+            if self.reference_cloud is None:
+                self.reference_cloud = point_cloud
+                return
+        
+            transformation = self.run_icp(point_cloud, self.reference_cloud)
+            # Update point cloud
             self.reference_cloud = point_cloud
-            return
-      
-        transformation = self.run_icp(point_cloud, self.reference_cloud)
-        # Update point cloud
-        self.reference_cloud = point_cloud
-        # Extract rotation and translation from transformation matrix
-        rotation_matrix = transformation[:3, :3]
-        translation_vector = transformation[:3, 3]
-        euler_angles = rotationMatrixToEulerAngles(rotation_matrix)
 
-        # Save data to calculate cov matrix
-        # new_line = '%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (translation_vector[0], translation_vector[1], translation_vector[2],
-        #                                                 euler_angles[0], euler_angles[1], euler_angles[2])
-        # with open('lidar_data.csv', 'a') as file:
-        #     file.write(new_line)
-        # rotation = Rot3(rotation_matrix)
-        # translation = Point3(translation_vector[0], translation_vector[1], translation_vector[2])
-        # lidar_pose = Pose3(rotation, translation)
-        lidar_pose = Pose3(transformation)
+            # Extract rotation and translation from transformation matrix
+            # rotation_matrix = transformation[:3, :3]
+            # translation_vector = transformation[:3, 3]
+            # Save data to calculate cov matrix
+            # euler_angles = rotationMatrixToEulerAngles(rotation_matrix)
+            # new_line = '%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (translation_vector[0], translation_vector[1], translation_vector[2],
+            #                                                 euler_angles[0], euler_angles[1], euler_angles[2])
+            # with open('lidar_data.csv', 'a') as file:
+            #     file.write(new_line)
 
-        lidar_noise = gtsam.noiseModel.Diagonal.Sigmas([5.21146953e-07, 3.11243524e-07, 0.0, 0.0, 0.0, 3.48658533e-09])
+            lidar_pose = Pose3(transformation)
 
-        self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, lidar_noise))
+            lidar_noise = gtsam.noiseModel.Diagonal.Sigmas([5.21146953e-07, 3.11243524e-07, 0.0, 0.0, 0.0, 3.48658533e-09])
+
+            self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, lidar_noise))
 
     # Optimize the factor graph
     def optimize_graph(self):
