@@ -3,6 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Imu, LaserScan
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from tf2_msgs.msg import TFMessage
 import gtsam
 from gtsam.symbol_shorthand import X, V, B
 from gtsam import PriorFactorPose3, BetweenFactorPose3, Pose3, Rot3, Point3, noiseModel
@@ -48,6 +49,7 @@ class localization_estimator(Node):
         self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)  # Odometry data subscription
         self.lidar_sub_ = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)  #Lidar data subsciption
         self.state_pub_ = self.create_publisher(Odometry, '/estimated_state', 10) # Publish estimated state
+        self.ground_truth_sub_ = self.create_subscription(TFMessage, '/tf', self.transform_callback, 10) # Transform subscription (to get real position of the robot)
         
         self.initial_pose_sub_ = self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self.initial_pose_callback, 10)  # Get initial pose from user's guess
         self.got_initial_pose = False
@@ -76,6 +78,8 @@ class localization_estimator(Node):
         #     file.write('x,y,z,rot_x,rot_y,rot_z\n')
         #     file.close()
 
+
+
     def initial_pose_callback(self, msg):
         self.got_initial_pose = False
         self.graph_ = gtsam.NonlinearFactorGraph()  # Reset the graph
@@ -85,6 +89,10 @@ class localization_estimator(Node):
         self.initial_estimate_.insert(X(0), Pose3())
         self.got_initial_pose = True
         self.keyframe_index_ = 1
+        # Save the trajectory
+        with open("trajectory.csv", 'w') as file:
+            file.write('type,t,x,y,z,qx,qy,qz,qw\n')
+            file.close()
 
 
     def preintegration_parameters(self, msg):
@@ -172,15 +180,23 @@ class localization_estimator(Node):
             self.get_logger().error("Problem with odometry data")
             return
         if self.got_initial_pose:
+            pos_x = msg.pose.pose.position.x + np.random.uniform(-0.1, 0.1)
+            pos_y = msg.pose.pose.position.y + np.random.uniform(-0.1, 0.1)
+            pos_z = msg.pose.pose.position.z
+            t = msg.header.stamp.sec + msg.header.stamp.nsec/1e9
+            with open("trajectory.csv", 'a') as file:
+                new_line = 'odom,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, pos_x, pos_y, pos_z, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y,
+                                                                         msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+                file.write(new_line)
             odom_pose = Pose3(Rot3.Quaternion(
                 msg.pose.pose.orientation.w,
                 msg.pose.pose.orientation.x,
                 msg.pose.pose.orientation.y,
                 msg.pose.pose.orientation.z),
                 Point3(
-                    msg.pose.pose.position.x,
-                    msg.pose.pose.position.y,
-                    msg.pose.pose.position.z))
+                    pos_x,
+                    pos_y,
+                    pos_z))
 
             # Implement factor graph for odometry data
             odom_noise = gtsam.noiseModel.Diagonal.Sigmas([msg.pose.covariance[0],
@@ -253,9 +269,28 @@ class localization_estimator(Node):
         estimated_state.pose.pose.orientation.y = optimized_orientation.y()
         estimated_state.pose.pose.orientation.z = optimized_orientation.z()
         self.state_pub_.publish(estimated_state)
+        with open("trajectory.csv", 'a') as file:
+            t = estimated_state.header.stamp.sec + estimated_state.header.stamp.nsec/1e9
+            new_line = 'estimator,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, estimated_state.pose.pose.position.x, estimated_state.pose.pose.position.y,
+                                                                        estimated_state.pose.pose.position.z, 
+                                                                        estimated_state.pose.pose.orientation.x, estimated_state.pose.pose.orientation.y,
+                                                                        estimated_state.pose.pose.orientation.z, estimated_state.pose.pose.orientation.w)
+            file.write(new_line)
         # self.graph_.resize(0)
         # self.initial_estimate_.clear()
 
+    def transform_callback(self, msg):
+        self.get_logger().info(str(msg.transforms))
+        for transformation in msg.transforms:
+            self.get_logger().info(str(transformation.header))
+            if transformation.header.frame_id == "odom" and transformation.child_frame_id == "base_footprint":
+                with open("trajectory.csv", 'a') as file:
+                    t = transformation.header.stamp.sec + transformation.header.stamp.nanosec/1e9
+                    new_line = 'real,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, transformation.transform.translation.x, transformation.transform.translation.y,
+                                                                                transformation.transform.translation.z, transformation.transform.rotation.x,
+                                                                                transformation.transform.rotation.y, transformation.transform.rotation.z,
+                                                                                transformation.transform.rotation.w)
+                    file.write(new_line)
 
 def main(args=None):
     rclpy.init(args=args)
