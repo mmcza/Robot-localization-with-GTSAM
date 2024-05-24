@@ -9,7 +9,38 @@ from gtsam import PriorFactorPose3, BetweenFactorPose3, Pose3, Rot3, Point3, noi
 from gtsam import PreintegratedImuMeasurements, PreintegrationParams
 import numpy as np
 import open3d as o3d
-from transforms3d.euler import mat2euler
+import math
+
+# From https://learnopencv.com/rotation-matrix-to-euler-angles/
+# Checks if a matrix is a valid rotation matrix.
+def isRotationMatrix(R) :
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+ 
+# Calculates rotation matrix to euler angles
+# The result is the same as MATLAB except the order
+# of the euler angles ( x and z are swapped ).
+def rotationMatrixToEulerAngles(R) :
+ 
+    assert(isRotationMatrix(R))
+ 
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+ 
+    singular = sy < 1e-6
+ 
+    if  not singular :
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+ 
+    return np.array([x, y, z])
 
 def preintegration_parameters():
      gravity=9.81
@@ -51,6 +82,12 @@ class localization_estimator(Node):
         # Initialize point cloud
         self.reference_cloud = None
         self.keyframe_index_ = 1
+
+        # Collect data to calculate Cov matrix for Lidar
+        # with open("lidar_data.csv", 'w') as file:
+        #     file.write('x,y,z,rot_x,rot_y,rot_z\n')
+        #     file.close()
+
 
     def initial_pose_callback(self, msg):
         self.got_initial_pose = True
@@ -155,16 +192,23 @@ class localization_estimator(Node):
         # Update point cloud
         self.reference_cloud = point_cloud
         # Extract rotation and translation from transformation matrix
-        # rotation_matrix = transformation[:3, :3]
-        # translation_vector = transformation[:3, 3]
+        rotation_matrix = transformation[:3, :3]
+        translation_vector = transformation[:3, 3]
+        euler_angles = rotationMatrixToEulerAngles(rotation_matrix)
+
+        # Save data to calculate cov matrix
+        # new_line = '%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (translation_vector[0], translation_vector[1], translation_vector[2],
+        #                                                 euler_angles[0], euler_angles[1], euler_angles[2])
+        # with open('lidar_data.csv', 'a') as file:
+        #     file.write(new_line)
         # rotation = Rot3(rotation_matrix)
         # translation = Point3(translation_vector[0], translation_vector[1], translation_vector[2])
         # lidar_pose = Pose3(rotation, translation)
         lidar_pose = Pose3(transformation)
-        rotation_matrix = transformation[:3, :3]
-        euler_angles = mat2euler(rotation_matrix, axes='sxyz')
 
-        self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, odom_noise))
+        lidar_noise = gtsam.noiseModel.Diagonal.Sigmas([5.21146953e-07, 3.11243524e-07, 0.0, 0.0, 0.0, 3.48658533e-09])
+
+        self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, lidar_noise))
         #TODO
 
     # Optimize the factor graph
@@ -181,8 +225,7 @@ class localization_estimator(Node):
         # Create a message with estimate state and publish it
         estimated_state = Odometry()
         estimated_state.header.stamp = self.get_clock().now().to_msg()
-        self.get_logger().info(str(optimized_position))
-        self.get_logger().info(str(optimized_orientation))
+        estimated_state.header.frame_id = "map"
         estimated_state.pose.pose.position.x = optimized_position[0]
         estimated_state.pose.pose.position.y = optimized_position[1]
         estimated_state.pose.pose.position.z = optimized_position[2]
