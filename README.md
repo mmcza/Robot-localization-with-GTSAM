@@ -99,7 +99,7 @@ source install/setup.bash
 
 In first terminal start the simulation using the following command
 ```
-ros2 launch nav2_bringup tb3_simulation_launch.py
+ros2 launch nav2_bringup tb3_simulation_launch.py headless:=False
 ```
 
 In second terminal (make sure to source the local setup using `source install/setup.bash`) start the pose estimator
