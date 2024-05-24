@@ -9,6 +9,7 @@ from gtsam import PriorFactorPose3, BetweenFactorPose3, Pose3, Rot3, Point3, noi
 from gtsam import PreintegratedImuMeasurements, PreintegrationParams
 import numpy as np
 import open3d as o3d
+from transforms3d.euler import mat2euler
 
 def preintegration_parameters():
      gravity=9.81
@@ -160,6 +161,8 @@ class localization_estimator(Node):
         # translation = Point3(translation_vector[0], translation_vector[1], translation_vector[2])
         # lidar_pose = Pose3(rotation, translation)
         lidar_pose = Pose3(transformation)
+        rotation_matrix = transformation[:3, :3]
+        euler_angles = mat2euler(rotation_matrix, axes='sxyz')
 
         self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, odom_noise))
         #TODO
