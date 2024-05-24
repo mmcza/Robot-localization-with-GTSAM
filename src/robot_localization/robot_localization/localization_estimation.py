@@ -42,18 +42,6 @@ def rotationMatrixToEulerAngles(R) :
  
     return np.array([x, y, z])
 
-def preintegration_parameters():
-     gravity=9.81
-     params=PreintegrationParams.MakeSharedU(gravity)
-     I=np.eye(3)
-     params.setAccelerometerCovariance(I * 0.1)  # Set accelerometer covariance
-     params.setGyroscopeCovariance(I*0.1)  # Set gyroscope covariance
-     params.setIntegrationCovariance(I*0.1)
-     params.setUse2ndOrderCoriolis(False) # Disable 2nd order Coriolis effect
-     params.setOmegaCoriolis(np.ones((3,1))*0.1) # Zero out 
-     bias_covariance=noiseModel.Isotropic.Sigma(6,0.1)
-     return params, bias_covariance
-
 class localization_estimator(Node):
     def __init__(self):
         super().__init__('gtsam_locate')
@@ -77,7 +65,9 @@ class localization_estimator(Node):
         self.prev_velocity_ = self.Vector3(0, 0, 0)  # Previous velocity 
         self.prev_bias_ = gtsam.imuBias.ConstantBias()
         self.prev_time_ = self.get_clock().now
-        params, self.bias_covariance = preintegration_parameters()
+        self.pim = None
+        self.is_pim_set = False
+        self.imu_timer = 0.0
 
         # Initialize point cloud
         self.reference_cloud = None
@@ -88,10 +78,28 @@ class localization_estimator(Node):
         #     file.write('x,y,z,rot_x,rot_y,rot_z\n')
         #     file.close()
 
-
     def initial_pose_callback(self, msg):
         self.got_initial_pose = True
 
+
+    def preintegration_parameters(self, msg):
+        gravity=9.81
+        params=PreintegrationParams.MakeSharedU(gravity)
+        I=np.eye(3)
+        params.setAccelerometerCovariance(np.array(msg.linear_acceleration_covariance).reshape((3, 3)))  # Set accelerometer covariance
+        params.setGyroscopeCovariance(np.array(msg.angular_velocity_covariance).reshape((3, 3)))  # Set gyroscope covariance
+        params.setIntegrationCovariance(I*1e-7)
+        params.setUse2ndOrderCoriolis(False) # Disable 2nd order Coriolis effect
+        params.setOmegaCoriolis(np.zeros((3,1))) # Zero out 
+        # As in https://github.com/ROBOTIS-GIT/turtlebot3/blob/master/turtlebot3_description/urdf/turtlebot3_waffle.gazebo.xacro
+        accBias = np.array([0.1, 0.1, 0.1])
+        gyroBias = np.array([0.0000075, 0.0000075, 0.0000075])
+        bias_covariance=noiseModel.Isotropic.Sigma(6,0.1)
+        actualBias = gtsam.imuBias.ConstantBias(accBias, gyroBias)
+        # Calculate PIM
+        self.pim = PreintegratedImuMeasurements(params, actualBias)
+        self.is_pim_set = True
+        
 
     def Vector3(self, x, y, z):
         return np.array([x, y, z])
@@ -136,14 +144,24 @@ class localization_estimator(Node):
         if not msg:
             self.get_logger().error("Problem with IMU data")
             return
+        if not is_pim_set:
+            self.preintegration_parameters(msg)
         accelerometer = self.Vector3(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z)
         gyroscope = self.Vector3(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z)
         current_time = self.get_clock().now()  # Aktualny czas
         dt = (current_time - self.prev_time_).nanoseconds / 1e9
         self.prev_time_ = current_time
 
-    	#TODO 
-        imu_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+        pim.integrateMeasurement(measuredAcc, measuredOmega, dt)
+
+        if self.imu_timer > 0.1:
+            imufactor=gtsam.ImuFactor(X(self.keyframe_index -1), V(self.keyframeindex -1), X(self.keyframeindex), V(self.keyframeindex), B(0), self.pim)
+            self.graph_.add(imufactor)
+            dt = 0.0
+            pim.resetIntegration()
+
+    	# #TODO 
+        # imu_noise = gtsam.noiseModel.Diagonal.Sigmas([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
      # Callback for odometry data
     def odom_callback(self, msg):
@@ -209,7 +227,6 @@ class localization_estimator(Node):
         lidar_noise = gtsam.noiseModel.Diagonal.Sigmas([5.21146953e-07, 3.11243524e-07, 0.0, 0.0, 0.0, 3.48658533e-09])
 
         self.graph_.add(BetweenFactorPose3(X(self.keyframe_index_ - 1), X(self.keyframe_index_), lidar_pose, lidar_noise))
-        #TODO
 
     # Optimize the factor graph
     def optimize_graph(self):
