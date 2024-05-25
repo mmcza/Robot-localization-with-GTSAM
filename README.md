@@ -5,7 +5,9 @@ Project for course "Artificial Intelligence in Robotics"
 - [Robot localization with GTSAM](#robot-localization-with-gtsam)
   - [Table of Contents](#table-of-contents)
   - [1. About the project](#1-about-the-project)
-  - [2. Installing dependencies](#2-installing-dependencies)
+    - [Goal of the project](#goal-of-the-project)
+    - [Sensors](#sensors)
+  - [2. Installing the dependencies](#2-installing-the-dependencies)
     - [Create a workspace](#create-a-workspace)
     - [a.) Using Ubuntu 22.04 and ROS2 Humble (without Docker)](#a-using-ubuntu-2204-and-ros2-humble-without-docker)
       - [Install the following modules](#install-the-following-modules)
@@ -17,10 +19,25 @@ Project for course "Artificial Intelligence in Robotics"
     - [Workspace preparation](#workspace-preparation)
     - [Build the package](#build-the-package)
     - [Start the simulation](#start-the-simulation)
+  - [4. Running the experiment](#4-running-the-experiment)
+  - [5. Results](#5-results)
+      - [TODO](#todo)
+  - [References](#references)
 
 ## 1. About the project
 
-## 2. Installing dependencies
+### Goal of the project
+Goal of the project was to prepare a state estimator using graph optimization for sensor fusion. To accomplish that the [GTSAM library](https://gtsam.org/) [[1]](#1) was chosen.
+
+### Sensors
+For the project we chose to simulate a [TurtleBot3 Waffle](https://www.turtlebot.com/turtlebot3/) in [Gazebo simulator](https://docs.ros.org/en/humble/Tutorials/Advanced/Simulators/Gazebo/Simulation-Gazebo.html). The 3 sensors used to create a factor graph were:
+- Odometry,
+- IMU,
+- LiDAR.
+
+From odometry the position and orientation was available straight away, from IMU it was enough to integrate the linear acceleration twice to get the position and to integrate angular velocity once to receive the orientation. LiDAR returns distance to obstacles around the robot, so those values were used to create a point cloud. ICP (Iterative closest point) algorithm [[2]](#2) uses two consecutive point clouds and finds the rotation matrix and translation vector between them (we chose the [Open3D](https://github.com/isl-org/Open3D) [[3]](#3) implementation of the algorithm).
+
+## 2. Installing the dependencies
 
 ### Create a workspace
 
@@ -97,12 +114,34 @@ source install/setup.bash
 
 ### Start the simulation
 
-In first terminal start the simulation using the following command
+In first terminal start the estimator 
+```
+ros2 run robot_localization estimator
+```
+
+In second terminal start the simulator
+
 ```
 ros2 launch nav2_bringup tb3_simulation_launch.py headless:=False
 ```
 
-In second terminal (make sure to source the local setup using `source install/setup.bash`) start the pose estimator
-```
-ros2 run robot_localization estimator
-```
+## 4. Running the experiment
+
+After launching the estimator and simulator you have to estimate the initial position (by clicking specific button and placing arrow inside RVIZ) and add a goal (so the robot start to move). You can also visualize the estimated state of the robot.
+
+![Instruction how to start the experiment](data/pictures/Running_experiment.gif)
+
+Position and orientation of the robot (from estimator, ground truth from gazebo and odometry) is also saved to `trajectory.csv` file, so it's possible to display it and check the results after the experiment has ended.
+![State estimation](data/pictures/Robot_state_estimation.png)
+
+## 5. Results
+
+#### TODO
+
+## References
+
+<a id="1">[1]</a> Dellaert, F. and GTSAM Contributors borglab/gtsam v.4.2a8. Georgia Tech Borg Lab (2022). https://github.com/borglab/gtsam, https://doi.org/10.5281/zenodo.5794541
+
+<a id="2">[2]</a>  Zhang, Z. Iterative point matching for registration of free-form curves and surfaces. Int J Comput Vision 13, 119–152 (1994). https://doi.org/10.1007/BF01427149
+
+<a id="3">[3]</a>  Zhou, Q. and Park, J. and Koltun, V. Open3D: A Modern Library for 3D Data Processing. arXiv (2018). https://doi.org/10.48550/arXiv.1801.09847

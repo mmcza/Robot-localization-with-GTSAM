@@ -182,10 +182,12 @@ class localization_estimator(Node):
         if self.got_initial_pose:
             pos_x = msg.pose.pose.position.x + np.random.uniform(-0.1, 0.1)
             pos_y = msg.pose.pose.position.y + np.random.uniform(-0.1, 0.1)
+            # pos_x = msg.pose.pose.position.x
+            # pos_y = msg.pose.pose.position.y
             pos_z = msg.pose.pose.position.z
-            t = msg.header.stamp.sec + msg.header.stamp.nsec/1e9
+            t = msg.header.stamp.sec + msg.header.stamp.nanosec/1e9
             with open("trajectory.csv", 'a') as file:
-                new_line = 'odom,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, pos_x, pos_y, pos_z, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y,
+                new_line = 'odom,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, pos_x, pos_y, pos_z, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y,
                                                                          msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
                 file.write(new_line)
             odom_pose = Pose3(Rot3.Quaternion(
@@ -270,8 +272,8 @@ class localization_estimator(Node):
         estimated_state.pose.pose.orientation.z = optimized_orientation.z()
         self.state_pub_.publish(estimated_state)
         with open("trajectory.csv", 'a') as file:
-            t = estimated_state.header.stamp.sec + estimated_state.header.stamp.nsec/1e9
-            new_line = 'estimator,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, estimated_state.pose.pose.position.x, estimated_state.pose.pose.position.y,
+            t = estimated_state.header.stamp.sec + estimated_state.header.stamp.nanosec/1e9
+            new_line = 'estimator,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, estimated_state.pose.pose.position.x, estimated_state.pose.pose.position.y,
                                                                         estimated_state.pose.pose.position.z, 
                                                                         estimated_state.pose.pose.orientation.x, estimated_state.pose.pose.orientation.y,
                                                                         estimated_state.pose.pose.orientation.z, estimated_state.pose.pose.orientation.w)
@@ -280,13 +282,11 @@ class localization_estimator(Node):
         # self.initial_estimate_.clear()
 
     def transform_callback(self, msg):
-        self.get_logger().info(str(msg.transforms))
         for transformation in msg.transforms:
-            self.get_logger().info(str(transformation.header))
             if transformation.header.frame_id == "odom" and transformation.child_frame_id == "base_footprint":
                 with open("trajectory.csv", 'a') as file:
                     t = transformation.header.stamp.sec + transformation.header.stamp.nanosec/1e9
-                    new_line = 'real,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, transformation.transform.translation.x, transformation.transform.translation.y,
+                    new_line = 'real,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' % (t, transformation.transform.translation.x, transformation.transform.translation.y,
                                                                                 transformation.transform.translation.z, transformation.transform.rotation.x,
                                                                                 transformation.transform.rotation.y, transformation.transform.rotation.z,
                                                                                 transformation.transform.rotation.w)
