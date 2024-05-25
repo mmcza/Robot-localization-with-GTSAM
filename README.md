@@ -157,6 +157,8 @@ The estimator without the intial position has lowest values for all parameters a
 
 Based on the data from the table, it is noticeable that the estimator does its job and reduces the noise.
 
+![Trajectory comparision](data/pictures/estimated_vs_real_odometry_trajectory.png)
+
 ## References
 
 <a id="1">[1]</a> Dellaert, F. and GTSAM Contributors borglab/gtsam v.4.2a8. Georgia Tech Borg Lab (2022). https://github.com/borglab/gtsam, https://doi.org/10.5281/zenodo.5794541
