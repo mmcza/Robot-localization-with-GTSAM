@@ -157,6 +157,7 @@ The estimator without the intial position has lowest values for all parameters a
 
 Based on the data from the table, it is noticeable that the estimator does its job and reduces the noise.
 
+This plot illustrates the comparison of odometry, estimated, and real trajectories collected from the dataset.
 ![Trajectory comparision](data/pictures/estimated_vs_real_odometry_trajectory.png)
 
 ## References
