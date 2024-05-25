@@ -21,7 +21,6 @@ Project for course "Artificial Intelligence in Robotics"
     - [Start the simulation](#start-the-simulation)
   - [4. Running the experiment](#4-running-the-experiment)
   - [5. Results](#5-results)
-      - [TODO](#todo)
   - [References](#references)
 
 ## 1. About the project
@@ -136,7 +135,27 @@ Position and orientation of the robot (from estimator, ground truth from gazebo 
 
 ## 5. Results
 
-#### TODO
+Due to the fact that the Odometry was returning basically same results as real position of the robot, there was added an additional noise with normal distribution ($\mu = 0, \:\sigma=0.1$) to robot's position. After that the noisy position was used as the reference to be optimized.
+
+A comparision of Odometry error (with noise) and error from our estimator can be seen on the plot below
+![Error comparision](data/pictures/Error_comparision.png)
+
+Table with parameters for both errors (additionally after removing first measurement as it was completely different for the estimator) - calculated using [Pandas describe() method](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.describe.html).
+
+|Parameter | Estimator  | Odometry | Estimator >0s | Odometry >0s |
+| ---------| -----------| ---------| ------------- | ------------ |
+| count    | 736        | 736      | 735           | 735          |
+| mean     | 0.099232   | 0.104481 | 0.096562      | 0.104488     |
+| std      | 0.088873   | 0.056087 | 0.051536      | 0.056125     |
+| min      | 0.004427   | 0.002932 | 0.004427      | 0.002932     |
+| 25%      | 0.059396   | 0.062254 | 0.059389      | 0.062188     |
+| 50%      | 0.086959   | 0.095967 | 0.086887      | 0.095914     |
+| 75%      | 0.122585   | 0.135575 | 0.122386      | 0.135611     |
+| max      | 2.061525   | 0.304993 | 0.314617      | 0.304993     |
+
+The estimator without the intial position has lowest values for all parameters apart from it's outliers - `min` and `max` (what is interesting because both `top 25%` and `top 75%` are the lowest). The mean value of odometry's error is ~8% bigger than the mean error of estimator. 
+
+Based on the data from the table, it is noticeable that the estimator does its job and reduces the noise.
 
 ## References
 
