@@ -36,6 +36,12 @@ For the project we chose to simulate a [TurtleBot3 Waffle](https://www.turtlebot
 
 From odometry the position and orientation was available straight away, from IMU it was enough to integrate the linear acceleration twice to get the position and to integrate angular velocity once to receive the orientation. LiDAR returns distance to obstacles around the robot, so those values were used to create a point cloud. ICP (Iterative closest point) algorithm [[2]](#2) uses two consecutive point clouds and finds the rotation matrix and translation vector between them (we chose the [Open3D](https://github.com/isl-org/Open3D) [[3]](#3) implementation of the algorithm).
 
+### Factor graph
+
+The factor graph, made with all sensors from previous subsection, is shown in the picture below. 
+
+![Factor graph](/data/pictures/Factor_graph.png)
+
 ## 2. Installing the dependencies
 
 ### Create a workspace
@@ -156,6 +162,10 @@ Table with parameters for both errors (additionally after removing first measure
 The estimator without the intial position has lowest values for all parameters apart from it's outliers - `min` and `max` (what is interesting because both `top 25%` and `top 75%` are the lowest). The mean value of odometry's error is ~8% bigger than the mean error of estimator. 
 
 Based on the data from the table, it is noticeable that the estimator does its job and reduces the noise.
+
+## 6. Possible developments
+
+Due to some issues with sampling of the real position of the robot there might be made some improvements. One way could be to add constant and equal interval between adding factors to the graph. Another possible solution would be to optimize the graph less frequently (for example once every 5 or 10 poses are added as initial state to the graph.)
 
 ## References
 

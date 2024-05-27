@@ -181,7 +181,7 @@ class localization_estimator(Node):
             return
         if self.got_initial_pose:
             pos_x = msg.pose.pose.position.x + np.random.normal(0, 0.1)
-            pos_y = msg.pose.pose.position.y + np.random.uniform(0, 0.1)
+            pos_y = msg.pose.pose.position.y + np.random.normal(0, 0.1)
             # pos_x = msg.pose.pose.position.x
             # pos_y = msg.pose.pose.position.y
             pos_z = msg.pose.pose.position.z

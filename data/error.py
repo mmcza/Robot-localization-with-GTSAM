@@ -52,14 +52,18 @@ real['error_estimator'] = real.apply(
     lambda row: calculate_error(get_closest_row(estimator, row['closest_timestamps_estimator']), row), axis=1)
 
 real_filtered = real[real['t'] < 25]
-real_filtered = real_filtered[real_filtered['t'] > 0]
+real_filtered = real[real['t'] > 0]
 
 print(real_filtered['error_estimator'].describe())
 print(real_filtered['error_odom'].describe())
 
+t = real_filtered['t'].to_numpy()
+error_odom = real_filtered['error_odom'].to_numpy()
+error_estimator = real_filtered['error_estimator'].to_numpy()
+
 plt.figure(figsize=(12, 6))
-plt.plot(real_filtered['t'], real_filtered['error_odom'], label='Error Odom', color='blue', marker='o')
-plt.plot(real_filtered['t'], real_filtered['error_estimator'], label='Error Estimator', color='green', marker='x')
+plt.plot(t, error_odom, label='Error Odom', color='blue', marker='o')
+plt.plot(t, error_estimator, label='Error Estimator', color='green', marker='x')
 
 plt.xlabel('Time')
 plt.ylabel('Error')
