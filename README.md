@@ -7,6 +7,7 @@ Project for course "Artificial Intelligence in Robotics"
   - [1. About the project](#1-about-the-project)
     - [Goal of the project](#goal-of-the-project)
     - [Sensors](#sensors)
+    - [Factor graph](#factor-graph)
   - [2. Installing the dependencies](#2-installing-the-dependencies)
     - [Create a workspace](#create-a-workspace)
     - [a.) Using Ubuntu 22.04 and ROS2 Humble (without Docker)](#a-using-ubuntu-2204-and-ros2-humble-without-docker)
@@ -21,6 +22,7 @@ Project for course "Artificial Intelligence in Robotics"
     - [Start the simulation](#start-the-simulation)
   - [4. Running the experiment](#4-running-the-experiment)
   - [5. Results](#5-results)
+  - [6. Possible development](#6-possible-development)
   - [References](#references)
 
 ## 1. About the project
@@ -163,7 +165,10 @@ The estimator without the intial position has lowest values for all parameters a
 
 Based on the data from the table, it is noticeable that the estimator does its job and reduces the noise.
 
-## 6. Possible developments
+This plot illustrates the comparison of odometry, estimated, and real trajectories collected from the dataset.
+![Trajectory comparision](data/pictures/estimated_vs_real_odometry_trajectory.png)
+
+## 6. Possible development
 
 Due to some issues with sampling of the real position of the robot there might be made some improvements. One way could be to add constant and equal interval between adding factors to the graph. Another possible solution would be to optimize the graph less frequently (for example once every 5 or 10 poses are added as initial state to the graph.)
 
